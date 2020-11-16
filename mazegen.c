@@ -5,7 +5,7 @@
 #include "bitmap.h"
 #include "heap.h"
 
-#define MAZE_SIZE 64
+#define MAZE_SIZE 128
 #define NUM_NODES_ROW ((MAZE_SIZE - 1) / 2)
 #define NUM_NODES ((NUM_NODES_ROW) * (NUM_NODES_ROW))
 #define BLACK 'B'
@@ -218,7 +218,8 @@ static int prim(unsigned char *maze_pixels)
     //memset(visited_nodes, 0, NUM_NODES);
     for (int i = 0; i < NUM_NODES; i++) {
         //visited_nodes[i] = random_number(100000);
-        visited_nodes[i] = random_number(200);
+        // * visited_nodes[i] = random_number(200);
+        visited_nodes[i] = random_number(135);
         //visited_nodes[i] = random_number(5);
     }
 
