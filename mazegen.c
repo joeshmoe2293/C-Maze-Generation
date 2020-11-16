@@ -2,9 +2,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include "bitmap.h"
 #include "heap.h"
 
-#define MAZE_SIZE 27
+#define MAZE_SIZE 64
 #define NUM_NODES_ROW ((MAZE_SIZE - 1) / 2)
 #define NUM_NODES ((NUM_NODES_ROW) * (NUM_NODES_ROW))
 #define BLACK 'B'
@@ -53,8 +54,8 @@ static int init_maze(unsigned char *maze_pixels)
         return -1;
     }
 
-    if (MAZE_SIZE % 2 != 1 || MAZE_SIZE < 3) {
-        printf("Maze must be an odd size greater than 3\n");
+    if (MAZE_SIZE < 4 || MAZE_SIZE % 4 != 0) {
+        printf("Maze must be a multiple of 4\n");
         return -1;
     }
 
@@ -82,6 +83,39 @@ static void print_maze(unsigned char *maze_pixels)
     }
 }
 
+static void output_maze(unsigned char *maze_pixels)
+{
+    const int WIDTH = MAZE_SIZE;
+    const int HEIGHT = MAZE_SIZE;
+    bitmap_t *bitmap;
+    int color = 0x00;
+        
+    if (0 != init_bitmap(&bitmap, WIDTH, HEIGHT)) {
+        return;
+    }
+
+    for (int i = 0; i < HEIGHT; i++) {
+        for (int j = 0; j < WIDTH; j++) {
+            if (maze_pixels[maze_idx_from_row_col(i, j)] == BLACK) {
+                color = 0x00;
+            } else if (maze_pixels[maze_idx_from_row_col(i, j)] == WHITE) {
+                color = 0xFF;
+            } else {
+                printf("ERROR UNRECOGNIZED COLOR AT i %d j %d\n", i, j);
+                return;
+            }
+
+            set_pixel(bitmap, i, j, color, color, color);
+        }
+    }
+
+    if (0 != save_bitmap(bitmap, "maze.bmp")) {
+        printf("Failed to save bitmap!\n");
+    }
+
+    free_bitmap(&bitmap);
+}
+
 static int random_number(int max)
 {
     static int seeded = 0;
@@ -92,7 +126,7 @@ static int random_number(int max)
         seeded = 1;
     }
 
-    return rand() % max;
+    return (rand() % max) + 1;
 }
 
 static void mark_empty(unsigned char *maze_pixels, int current_idx,
@@ -137,23 +171,30 @@ static void add_neighbor_to_heap(heap_t *heap, node_data_t *current_node,
     // we haven't previously visited it
     if (neighbor_row >= 0 && neighbor_row < NUM_NODES_ROW &&
         neighbor_col >= 0 && neighbor_col < NUM_NODES_ROW &&
-        visited_nodes[neighbor_idx] == 0) {
+        visited_nodes[neighbor_idx] != 0) {
         // Store the info about this node's location + total distance
         neighbor_node = (node_data_t *)malloc(sizeof(node_data_t));
         neighbor_node->row = neighbor_row;
         neighbor_node->col = neighbor_col;
         neighbor_node->idx = neighbor_idx;
-        neighbor_node->distance = random_number(100) + current_node->distance;
+        neighbor_node->distance = visited_nodes[neighbor_idx] + current_node->distance;
         neighbor_node->pred_idx = current_node->idx;
 
         heap_insert(heap, neighbor_node->distance, (void *)neighbor_node);
-        visited_nodes[neighbor_idx] = 1;
+        visited_nodes[neighbor_idx] = 0;
     }
 }
 
 static void add_neighbors_to_heap(heap_t *heap, node_data_t *current_node,
                                   char *visited_nodes)
 {
+    /*
+    // Add east, then south, then west, then north
+    add_neighbor_to_heap(heap, current_node, visited_nodes, 0, 1);
+    add_neighbor_to_heap(heap, current_node, visited_nodes, 1, 0);
+    add_neighbor_to_heap(heap, current_node, visited_nodes, 0, -1);
+    add_neighbor_to_heap(heap, current_node, visited_nodes, -1, 0);
+    */
     // Add north, then west, then east, then south
     add_neighbor_to_heap(heap, current_node, visited_nodes, -1, 0);
     add_neighbor_to_heap(heap, current_node, visited_nodes, 0, -1);
@@ -174,10 +215,16 @@ static int prim(unsigned char *maze_pixels)
 
     // Processed nodes -> what have we added to the MST
     visited_nodes = (char *)malloc(NUM_NODES);
-    memset(visited_nodes, 0, NUM_NODES);
+    //memset(visited_nodes, 0, NUM_NODES);
+    for (int i = 0; i < NUM_NODES; i++) {
+        //visited_nodes[i] = random_number(100000);
+        visited_nodes[i] = random_number(200);
+        //visited_nodes[i] = random_number(5);
+    }
 
     // Find a random node for starting off
-    start_node = random_number(NUM_NODES);
+    //start_node = random_number(NUM_NODES) - 1;
+    start_node = 0;
 
     // Store info about the location of the first node
     node_data = (node_data_t *)malloc(sizeof(node_data_t));
@@ -189,7 +236,7 @@ static int prim(unsigned char *maze_pixels)
 
     heap_insert(edges_heap, 0, (void *)node_data);
    
-    visited_nodes[start_node] = 1;
+    visited_nodes[start_node] = 0;
 
     while (edges_heap->size > 0) {
         current_node = heap_extract_min(edges_heap);
@@ -207,6 +254,12 @@ static int prim(unsigned char *maze_pixels)
                               visited_nodes);
 
         free(current_node.data);
+    }
+
+    for (int i = 0; i < NUM_NODES; i++) {
+        if (visited_nodes[i] != 0) {
+            printf("Missed a node at index %d\n", i);
+        }
     }
 
     free(visited_nodes);
@@ -237,7 +290,8 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    print_maze(maze_pixels);
+    //print_maze(maze_pixels);
+    output_maze(maze_pixels);
 
     free(maze_pixels);
 
